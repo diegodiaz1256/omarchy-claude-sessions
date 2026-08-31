@@ -65,7 +65,14 @@ To do it by hand instead, add to that file:
 In `~/.config/hypr/bindings.conf`:
 
 ```
-bind = SUPER, C, exec, omarchy-shell shell summon diegodiaz1256.claude-sessions
+bind = SUPER, A, exec, omarchy-shell shell summon diegodiaz1256.claude-sessions
+```
+
+Pick a key Omarchy is not already using — `SUPER + C` is copy, for instance.
+To see what is taken:
+
+```bash
+hyprctl binds -j | jq -r '.[] | select(.modmask == 64) | .key' | sort -u
 ```
 
 ## How it works
