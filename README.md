@@ -2,6 +2,8 @@
 
 Browse every past [Claude Code](https://claude.com/claude-code) session across all your projects and resume one in a terminal, from an Omarchy panel.
 
+![The Claude Sessions panel](preview.png)
+
 Claude's own `claude --resume` picker only lists sessions belonging to the directory it starts in. This panel gathers sessions from every project, shows the folder each one belongs to, and resumes by session id — so continuing yesterday's work in another repo is one keystroke instead of a `cd` followed by a second pick.
 
 ## Features
