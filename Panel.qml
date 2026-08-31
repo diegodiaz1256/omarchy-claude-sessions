@@ -190,8 +190,11 @@ Item {
         // units or against an ancestor's width both produced a card far
         // smaller than intended, so the dimensions are stated outright and
         // only shrink when the output is genuinely too small to hold them.
-        width: Math.min(panelWindow.width - 80, 1100)
-        height: Math.min(panelWindow.height - 80, 820)
+        width: Math.min(panelWindow.width - 80, 820)
+        // Follows the content so a short list is a short card, capped so a
+        // long one scrolls instead of running off the screen.
+        height: Math.min(panelWindow.height - 80, 760,
+          content.implicitHeight + Style.spacing.lg * 2)
         radius: Style.cornerRadius
         color: Color.menu.background
         border.width: 1
@@ -201,9 +204,12 @@ Item {
         MouseArea { anchors.fill: parent; onClicked: {} }
 
         ColumnLayout {
-          anchors.fill: parent
-          anchors.margins: Style.spacing.xxl
-          spacing: Style.spacing.lg
+          id: content
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.margins: Style.spacing.lg
+          spacing: Style.spacing.md
 
           RowLayout {
             Layout.fillWidth: true
@@ -289,7 +295,10 @@ Item {
           // the remaining height; only its contents swap.
           Item {
             Layout.fillWidth: true
-            Layout.fillHeight: true
+            // Tall enough for the rows, bounded so a long list scrolls inside
+            // the card rather than growing it past the screen.
+            Layout.preferredHeight: Math.min(list.contentHeight, 560)
+            Layout.minimumHeight: root.filtered.length > 0 ? 0 : Style.font.body * 3
 
             Text {
               anchors.left: parent.left
@@ -322,7 +331,7 @@ Item {
                 required property var modelData
 
                 width: list.width
-                height: rowLayout.implicitHeight + Style.spacing.xl * 2
+                height: rowLayout.implicitHeight + Style.spacing.md * 2
                 radius: Style.cornerRadius
                 color: index === root.cursor ? Color.menu.selectedBackground
                   : hover.hovered ? Style.hoverFill : "transparent"
@@ -342,8 +351,8 @@ Item {
                 ColumnLayout {
                   id: rowLayout
                   anchors.fill: parent
-                  anchors.margins: Style.spacing.xl
-                  spacing: Style.spacing.xs
+                  anchors.margins: Style.spacing.md
+                  spacing: Style.spacing.hairline
 
                   Text {
                     Layout.fillWidth: true

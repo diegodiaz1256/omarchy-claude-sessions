@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+"""Add a Claude submenu to the Omarchy menu.
+
+A plugin cannot do this on its own. The menu reads rows from exactly two
+files -- the packaged default and ~/.config/omarchy/extensions/omarchy-menu.jsonc
+-- and the `menu` plugin kind means "supply the whole menu UI", not "add rows
+to the existing one". `omarchy plugin add` has no post-install hook either, so
+nothing this plugin ships gets to run at install time. Hence a script the user
+chooses to run.
+
+Idempotent: running it twice leaves one copy of each row.
+"""
+
+import os
+import re
+import sys
+
+PLUGIN_ID = "diegodiaz1256.claude-sessions"
+EXTENSIONS = os.path.expanduser("~/.config/omarchy/extensions/omarchy-menu.jsonc")
+
+ROWS = [
+    ('"claude"', '  "claude": {"icon":"\U000f06c4","label":"Claude","aliases":["ai","claude-code"],'
+                 '"description":"Claude Code sessions"},'),
+    ('"claude.resume"', '  "claude.resume": {"icon":"\U000f0456","label":"Resume Session",'
+                        '"aliases":["resume","sessions"],'
+                        '"description":"Browse past Claude Code sessions and continue one",'
+                        f'"action":"omarchy-shell shell summon {PLUGIN_ID}",'
+                        '"when":"command -v claude"},'),
+    ('"claude.new"', '  "claude.new": {"icon":"\U000f0415","label":"New Session",'
+                     '"description":"Start Claude Code in your home folder",'
+                     '"action":"omarchy-launch-tui --app-id=org.omarchy.claude claude",'
+                     '"when":"command -v claude"},'),
+]
+
+
+def main():
+    if not os.path.exists(EXTENSIONS):
+        os.makedirs(os.path.dirname(EXTENSIONS), exist_ok=True)
+        open(EXTENSIONS, "w").write("{\n}\n")
+
+    text = open(EXTENSIONS).read()
+    lines = text.split("\n")
+
+    # Replace a row that is already there rather than appending a duplicate,
+    # so re-running after an update picks up the new definition.
+    added, updated = 0, 0
+    for key, row in ROWS:
+        at = next((i for i, ln in enumerate(lines)
+                   if ln.strip().startswith(key + ":")), None)
+        if at is not None:
+            if lines[at] != row:
+                lines[at] = row
+                updated += 1
+            continue
+        # Insert before the closing brace of the top-level object.
+        close = max(i for i, ln in enumerate(lines) if ln.strip().startswith("}"))
+        lines.insert(close, row)
+        added += 1
+
+    if not added and not updated:
+        print("Menu already up to date.")
+        return 0
+
+    open(EXTENSIONS, "w").write("\n".join(lines))
+    print(f"Updated {EXTENSIONS} ({added} added, {updated} updated).")
+    print("Open it with Super, then look under Claude.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

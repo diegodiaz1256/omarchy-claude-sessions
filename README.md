@@ -38,14 +38,27 @@ omarchy-shell shell summon diegodiaz1256.claude-sessions
 
 ### Add it to the Omarchy menu
 
-The menu reads `~/.config/omarchy/extensions/omarchy-menu.jsonc`. Add:
+```bash
+~/.config/omarchy/plugins/diegodiaz1256.claude-sessions/bin/add-to-omarchy-menu
+```
+
+It then appears under **Super → Claude → Resume Session**, and typing "claude"
+in the menu finds it.
+
+A plugin cannot register menu rows itself: the menu reads them from exactly two
+files, the packaged default and `~/.config/omarchy/extensions/omarchy-menu.jsonc`,
+and the `menu` plugin kind means "supply the whole menu UI" rather than "add rows
+to the existing one". `omarchy plugin add` has no post-install hook either, so
+this is a script you run rather than something the install does for you. It is
+idempotent, keeps the rest of your file untouched, and re-running it after an
+update refreshes the rows.
+
+To do it by hand instead, add to that file:
 
 ```jsonc
 "claude": {"icon":"󰛄","label":"Claude","aliases":["ai","claude-code"]},
 "claude.resume": {"icon":"󰑖","label":"Resume Session","aliases":["resume"],"action":"omarchy-shell shell summon diegodiaz1256.claude-sessions","when":"command -v claude"},
 ```
-
-It then appears under **Super → Claude → Resume Session**.
 
 ### Bind it to a key
 
