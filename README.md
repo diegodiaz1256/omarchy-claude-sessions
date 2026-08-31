@@ -20,13 +20,8 @@ Claude's own `claude --resume` picker only lists sessions belonging to the direc
 omarchy plugin add https://github.com/diegodiaz1256/omarchy-claude-sessions --enable
 ```
 
-Or manually:
-
-```bash
-git clone https://github.com/diegodiaz1256/omarchy-claude-sessions \
-  ~/.config/omarchy/plugins/diegodiaz1256.claude-sessions
-omarchy plugin enable diegodiaz1256.claude-sessions
-```
+`omarchy plugin add` validates the manifest before installing anything, which
+is why it is the only install path documented here.
 
 ## Usage
 
