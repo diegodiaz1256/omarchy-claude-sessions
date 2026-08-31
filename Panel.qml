@@ -59,6 +59,7 @@ Item {
 
   function open(payloadJson) {
     root.query = ""
+    search.text = ""
     root.cursor = 0
     root.error = ""
     root.opened = true
@@ -98,8 +99,17 @@ Item {
     // Resuming by session id rather than by cwd: ids are unique across
     // projects, so the right conversation is restored even when several
     // share a folder.
-    var cmd = "cd " + Util.shellQuote(session.cwd)
-      + " && exec claude --resume " + Util.shellQuote(session.id)
+    //
+    // A project folder can be gone -- deleted, or on a disk that is not
+    // mounted -- and a bare `cd` into it fails while the `&&` chain still
+    // exits 0, so the terminal would open and vanish with the reason on a
+    // window nobody gets to read. Hold it open on the error instead.
+    var quotedDir = Util.shellQuote(session.cwd)
+    var cmd = "if ! cd " + quotedDir + " 2>/dev/null; then "
+      + "echo \"This session's folder no longer exists:\"; "
+      + "echo \"  \" " + quotedDir + "; echo; "
+      + "read -rsn1 -p 'Press any key to close...'; exit 1; "
+      + "fi; exec claude --resume " + Util.shellQuote(session.id)
     Quickshell.execDetached(["omarchy-launch-tui",
       "--app-id=org.omarchy.claude-resume", "bash", "-lc", cmd])
     root.close()
@@ -157,7 +167,7 @@ Item {
 
     Rectangle {
       anchors.fill: parent
-      color: Qt.rgba(0, 0, 0, 0.55)
+      color: Color.menu.scrim
       MouseArea { anchors.fill: parent; onClicked: root.close() }
     }
 
@@ -177,9 +187,9 @@ Item {
         width: Math.min(panelWindow.width - 80, 1100)
         height: Math.min(panelWindow.height - 80, 820)
         radius: Style.cornerRadius
-        color: Color.background
+        color: Color.menu.background
         border.width: 1
-        border.color: Style.normalBorderColor
+        border.color: Color.menu.border
 
         // Swallow clicks so only the scrim outside dismisses.
         MouseArea { anchors.fill: parent; onClicked: {} }
@@ -189,11 +199,34 @@ Item {
           anchors.margins: Style.spacing.xxl
           spacing: Style.spacing.lg
 
+          RowLayout {
+            Layout.fillWidth: true
+            spacing: Style.spacing.md
+
+            Text {
+              text: "Claude Sessions"
+              color: Color.menu.text
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.subtitle
+              font.weight: Font.DemiBold
+            }
+
+            Item { Layout.fillWidth: true }
+
+            Text {
+              // The count follows the filter, so it doubles as feedback that
+              // typing is narrowing the list.
+              text: root.filtered.length + (root.filtered.length === 1 ? " session" : " sessions")
+              color: Color.muted
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+          }
+
           TextField {
             id: search
             Layout.fillWidth: true
             placeholderText: "Search Claude sessions"
-            text: root.query
             onTextChanged: {
               root.query = text
               root.cursor = 0
@@ -208,102 +241,115 @@ Item {
             Keys.onEnterPressed: root.resume(root.filtered[root.cursor])
           }
 
-          Text {
-            Layout.fillWidth: true
-            visible: root.error !== "" || root.loading
-              || (root.filtered.length === 0 && !root.loading)
-            text: root.error !== "" ? root.error
-              : root.loading ? "Reading sessions…"
-              : root.sessions.length === 0 ? "No Claude sessions yet"
-              : "No session matches “" + root.query + "”"
-            color: root.error !== "" ? Color.urgent : Color.muted
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            wrapMode: Text.WordWrap
-          }
-
-          ListView {
-            id: list
+          // The list and the empty-state message share one stretching slot.
+          // A hidden ColumnLayout child stops taking part in the layout, so
+          // hiding the list outright let the column collapse and pulled the
+          // search field into the middle of the card. The slot always fills
+          // the remaining height; only its contents swap.
+          Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: root.filtered.length > 0
-            model: root.filtered
-            clip: true
-            spacing: Style.spacing.xxs
-            currentIndex: root.cursor
-            boundsBehavior: Flickable.StopAtBounds
 
-            delegate: Rectangle {
-              required property int index
-              required property var modelData
+            Text {
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              visible: root.error !== "" || root.loading
+                || (root.filtered.length === 0 && !root.loading)
+              text: root.error !== "" ? root.error
+                : root.loading ? "Reading sessions…"
+                : root.sessions.length === 0 ? "No Claude sessions yet"
+                : "No session matches “" + root.query + "”"
+              color: root.error !== "" ? Color.urgent : Color.muted
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              wrapMode: Text.WordWrap
+            }
 
-              width: list.width
-              height: rowLayout.implicitHeight + Style.spacing.xl * 2
-              radius: Style.cornerRadius
-              color: index === root.cursor ? Style.selectedFill
-                : hover.hovered ? Style.hoverFill : "transparent"
+            ListView {
+              id: list
+              anchors.fill: parent
+              visible: root.filtered.length > 0
+              model: root.filtered
+              clip: true
+              spacing: Style.spacing.xxs
+              currentIndex: root.cursor
+              boundsBehavior: Flickable.StopAtBounds
 
-              HoverHandler {
-                id: hover
-                onHoveredChanged: if (hovered) root.cursor = index
-              }
-              TapHandler { onTapped: root.resume(modelData) }
+              delegate: Rectangle {
+                required property int index
+                required property var modelData
 
-              // Title on its own line at full width, then one quiet meta line
-              // holding folder and age. Three competing text sizes stacked
-              // against a right-aligned timestamp read as clutter; a single
-              // dimmed line under a clear title reads as one item.
-              ColumnLayout {
-                id: rowLayout
-                anchors.fill: parent
-                anchors.margins: Style.spacing.xl
-                spacing: Style.spacing.xs
+                width: list.width
+                height: rowLayout.implicitHeight + Style.spacing.xl * 2
+                radius: Style.cornerRadius
+                color: index === root.cursor ? Color.menu.selectedBackground
+                  : hover.hovered ? Style.hoverFill : "transparent"
+                border.width: index === root.cursor ? Style.selectedBorderWidth : 0
+                border.color: Color.menu.selectedBorder
 
-                Text {
-                  Layout.fillWidth: true
-                  text: modelData.title
-                  color: Color.foreground
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.subtitle
-                  font.weight: index === root.cursor ? Font.DemiBold : Font.Normal
-                  elide: Text.ElideRight
-                  maximumLineCount: 1
+                HoverHandler {
+                  id: hover
+                  onHoveredChanged: if (hovered) root.cursor = index
                 }
+                TapHandler { onTapped: root.resume(modelData) }
 
-                RowLayout {
-                  Layout.fillWidth: true
-                  spacing: Style.spacing.sm
+                // Title on its own line at full width, then one quiet meta line
+                // holding folder and age. Three competing text sizes stacked
+                // against a right-aligned timestamp read as clutter; a single
+                // dimmed line under a clear title reads as one item.
+                ColumnLayout {
+                  id: rowLayout
+                  anchors.fill: parent
+                  anchors.margins: Style.spacing.xl
+                  spacing: Style.spacing.xs
 
                   Text {
-                    text: root.shortPath(modelData.cwd)
-                    color: Color.muted
+                    Layout.fillWidth: true
+                    text: modelData.title
+                    color: index === root.cursor ? Color.menu.selectedText : Color.menu.text
                     font.family: root.fontFamily
-                    font.pixelSize: Style.font.bodySmall
-                    elide: Text.ElideMiddle
+                    font.pixelSize: Style.font.subtitle
+                    font.weight: index === root.cursor ? Font.DemiBold : Font.Normal
+                    elide: Text.ElideRight
                     maximumLineCount: 1
-                    // Give the path whatever the age does not need, so a long
-                    // path elides instead of pushing the age off the row.
-                    Layout.maximumWidth: rowLayout.width - age.implicitWidth
-                      - dot.implicitWidth - Style.spacing.sm * 2
                   }
 
-                  Text {
-                    id: dot
-                    text: "·"
-                    color: Color.muted
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.bodySmall
-                  }
+                  RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Style.spacing.sm
 
-                  Text {
-                    id: age
-                    text: root.relativeTime(modelData.mtime)
-                    color: Color.muted
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.bodySmall
-                  }
+                    Text {
+                      text: root.shortPath(modelData.cwd)
+                      color: Color.muted
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                      elide: Text.ElideMiddle
+                      maximumLineCount: 1
+                      // Give the path whatever the age does not need, so a long
+                      // path elides instead of pushing the age off the row.
+                      Layout.maximumWidth: rowLayout.width - age.implicitWidth
+                        - dot.implicitWidth - Style.spacing.sm * 2
+                    }
 
-                  Item { Layout.fillWidth: true }
+                    Text {
+                      id: dot
+                      text: "·"
+                      color: Color.muted
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                    }
+
+                    Text {
+                      id: age
+                      text: root.relativeTime(modelData.mtime)
+                      color: Color.muted
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                    }
+
+                    Item { Layout.fillWidth: true }
+                  }
                 }
               }
             }
