@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "zeroge.claude-sessions",
+  "id": "diegodiaz1256.claude-sessions",
   "name": "Claude Sessions",
   "version": "1.0.0",
-  "author": "zeroge",
+  "author": "diegodiaz1256",
   "license": "MIT",
   "description": "Browse past Claude Code sessions and resume one in a terminal",
   "kinds": [

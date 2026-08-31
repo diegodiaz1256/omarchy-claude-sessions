@@ -15,15 +15,15 @@ Claude's own `claude --resume` picker only lists sessions belonging to the direc
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/<you>/omarchy-claude-sessions --enable
+omarchy plugin add https://github.com/diegodiaz1256/omarchy-claude-sessions --enable
 ```
 
 Or manually:
 
 ```bash
-git clone https://github.com/<you>/omarchy-claude-sessions \
-  ~/.config/omarchy/plugins/zeroge.claude-sessions
-omarchy plugin enable zeroge.claude-sessions
+git clone https://github.com/diegodiaz1256/omarchy-claude-sessions \
+  ~/.config/omarchy/plugins/diegodiaz1256.claude-sessions
+omarchy plugin enable diegodiaz1256.claude-sessions
 ```
 
 ## Usage
@@ -31,7 +31,7 @@ omarchy plugin enable zeroge.claude-sessions
 Summon the panel:
 
 ```bash
-omarchy-shell shell summon zeroge.claude-sessions
+omarchy-shell shell summon diegodiaz1256.claude-sessions
 ```
 
 ### Add it to the Omarchy menu
@@ -40,7 +40,7 @@ The menu reads `~/.config/omarchy/extensions/omarchy-menu.jsonc`. Add:
 
 ```jsonc
 "claude": {"icon":"󰛄","label":"Claude","aliases":["ai","claude-code"]},
-"claude.resume": {"icon":"󰑖","label":"Resume Session","aliases":["resume"],"action":"omarchy-shell shell summon zeroge.claude-sessions","when":"command -v claude"},
+"claude.resume": {"icon":"󰑖","label":"Resume Session","aliases":["resume"],"action":"omarchy-shell shell summon diegodiaz1256.claude-sessions","when":"command -v claude"},
 ```
 
 It then appears under **Super → Claude → Resume Session**.
@@ -50,7 +50,7 @@ It then appears under **Super → Claude → Resume Session**.
 In `~/.config/hypr/bindings.conf`:
 
 ```
-bind = SUPER, C, exec, omarchy-shell shell summon zeroge.claude-sessions
+bind = SUPER, C, exec, omarchy-shell shell summon diegodiaz1256.claude-sessions
 ```
 
 ## How it works

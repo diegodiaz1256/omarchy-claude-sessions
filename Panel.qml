@@ -10,7 +10,7 @@ import qs.Ui
 // in a terminal on Enter.
 //
 // Standalone panel plugin, summoned with
-// `omarchy-shell shell summon zeroge.claude-sessions`. Each summon re-reads
+// `omarchy-shell shell summon diegodiaz1256.claude-sessions`. Each summon re-reads
 // the transcripts, so a session that ended a moment ago is already in the
 // list.
 //
@@ -143,7 +143,12 @@ Item {
       root.loading = false
       if (!root.opened) return
       if (exitCode !== 0) {
-        root.error = "Could not read Claude sessions"
+        // 127 is the shell/exec "not found" code, which for this script means
+        // its python3 interpreter is missing rather than anything being wrong
+        // with the sessions. Say which, so the fix is obvious.
+        root.error = exitCode === 127
+          ? "This plugin needs python3, which is not installed"
+          : "Could not read Claude sessions"
         return
       }
       try {
@@ -202,6 +207,15 @@ Item {
           RowLayout {
             Layout.fillWidth: true
             spacing: Style.spacing.md
+
+            Text {
+              // The same glyph the Omarchy menu uses for Claude, so the panel
+              // and the menu row that opens it are recognizably one thing.
+              text: "󰛄"
+              color: Color.menu.text
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.icon
+            }
 
             Text {
               text: "Claude Sessions"
