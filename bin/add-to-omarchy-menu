@@ -34,6 +34,11 @@ ROWS = [
 
 
 def main():
+    # The marketplace asks that a plugin not change user configuration without
+    # consent. Running this script is that consent, but say what will change
+    # and where before touching the file.
+    print(f"This will add three Claude rows to:\n  {EXTENSIONS}\n")
+
     if not os.path.exists(EXTENSIONS):
         os.makedirs(os.path.dirname(EXTENSIONS), exist_ok=True)
         open(EXTENSIONS, "w").write("{\n}\n")

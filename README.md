@@ -75,6 +75,17 @@ To see what is taken:
 hyprctl binds -j | jq -r '.[] | select(.modmask == 64) | .key' | sort -u
 ```
 
+## Uninstall
+
+```bash
+omarchy plugin remove diegodiaz1256.claude-sessions
+```
+
+If you added the menu rows, delete the three `"claude"` lines from
+`~/.config/omarchy/extensions/omarchy-menu.jsonc`; removing the plugin does not
+touch that file. The plugin stores nothing else — no state, no cache, and it
+never writes to `~/.claude`.
+
 ## How it works
 
 `bin/claude-sessions-list` reads the transcripts under `~/.claude/projects/` and emits JSON. Transcripts reach tens of megabytes, so it reads only the head of each file (for the first typed message and the recorded `cwd`) and the tail (for `ai-title`, which Claude appends as a session grows) rather than parsing them whole — about 45 ms for 13 sessions.
