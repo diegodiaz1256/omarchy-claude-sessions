@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
@@ -208,13 +209,39 @@ Item {
             Layout.fillWidth: true
             spacing: Style.spacing.md
 
-            Text {
-              // The same glyph the Omarchy menu uses for Claude, so the panel
-              // and the menu row that opens it are recognizably one thing.
-              text: "󰛄"
-              color: Color.menu.text
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.icon
+            // The Claude mark, shipped as an SVG: neither the Nerd Font nor
+            // Omarchy's own icon font has a Claude glyph -- U+F06C4, which the
+            // menu uses for its Claude row, is a generic sparkle. Rendered at
+            // 2x and scaled down so it stays crisp on HiDPI, and tinted with
+            // the themed menu text colour so it tracks the theme.
+            Item {
+              width: Style.font.icon
+              height: Style.font.icon
+
+              // Claude's own orange, so the mark reads as the brand rather
+              // than as one more monochrome glyph. Drawn white and recoloured
+              // through a sibling MultiEffect, the pattern the bar's tray
+              // uses: `layer.effect` left it untinted and it rendered raw
+              // black against the dark panel.
+              Image {
+                id: claudeMark
+                anchors.fill: parent
+                // Relative to this QML file, which is the plugin's own folder;
+                // the manifest's source dir is not exposed on panel instances.
+                source: "claude-mark.svg"
+                sourceSize.width: Style.font.icon * 2
+                sourceSize.height: Style.font.icon * 2
+                fillMode: Image.PreserveAspectFit
+                visible: false
+                layer.enabled: true
+              }
+
+              MultiEffect {
+                anchors.fill: claudeMark
+                source: claudeMark
+                colorization: 1.0
+                colorizationColor: "#d97757"
+              }
             }
 
             Text {
