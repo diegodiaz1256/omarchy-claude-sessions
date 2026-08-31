@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "zeroge.claude-sessions",
+  "name": "Claude Sessions",
+  "version": "1.0.0",
+  "author": "zeroge",
+  "license": "MIT",
+  "description": "Browse past Claude Code sessions and resume one in a terminal",
+  "kinds": [
+    "panel"
+  ],
+  "entryPoints": {
+    "panel": "Panel.qml"
+  }
+}

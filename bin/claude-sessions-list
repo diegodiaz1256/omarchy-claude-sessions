@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Emit Claude Code sessions as JSON for the claude-sessions panel.
+
+One object per session: id, cwd, title, subtitle and mtime.
+
+The title prefers the "ai-title" record Claude writes for each session -- a
+short, capitalized phrase like "Audio not working with dock". Falling back to
+the first typed message means a title that runs on, lowercased and truncated
+mid-word, which is what makes an unedited list hard to read. The first message
+is kept as the subtitle, where its length does no harm.
+
+Only the head and tail of each transcript are read. These files reach tens of
+megabytes; the first user message sits near the top, and ai-title is appended
+as the session goes, so it is found near the end.
+"""
+
+import json
+import os
+import sys
+
+PROJECTS = os.path.expanduser("~/.claude/projects")
+HEAD_BYTES = 512 * 1024
+TAIL_BYTES = 64 * 1024
+MAX_TITLE = 120
+
+
+def head_lines(path):
+    with open(path, "rb") as fh:
+        return fh.read(HEAD_BYTES).splitlines()
+
+
+def tail_lines(path, size):
+    with open(path, "rb") as fh:
+        if size > TAIL_BYTES:
+            fh.seek(-TAIL_BYTES, os.SEEK_END)
+            return fh.read().splitlines()[1:]
+        return fh.read().splitlines()
+
+
+def text_of(content):
+    """A message's content is either a plain string or a list of typed blocks."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                return block.get("text", "")
+    return ""
+
+
+def ai_title(path, size):
+    """The newest ai-title in the file: Claude refines it as a session grows."""
+    found = ""
+    for raw in tail_lines(path, size):
+        if b'"ai-title"' not in raw:
+            continue
+        try:
+            rec = json.loads(raw)
+        except ValueError:
+            continue
+        if rec.get("type") == "ai-title" and rec.get("aiTitle"):
+            found = " ".join(str(rec["aiTitle"]).split())
+    return found
+
+
+def session_info(path):
+    try:
+        stat = os.stat(path)
+    except OSError:
+        return None
+
+    title, cwd, started = "", "", ""
+    for raw in head_lines(path):
+        if not raw.strip():
+            continue
+        try:
+            rec = json.loads(raw)
+        except ValueError:
+            continue  # A truncated final line is normal in a live session.
+
+        if not cwd and rec.get("cwd"):
+            cwd = rec["cwd"]
+
+        if not title and rec.get("type") == "user":
+            # Skip tool results and meta turns: neither is something a human
+            # typed, so neither names the session.
+            if rec.get("isMeta") or rec.get("isSidechain"):
+                continue
+            body = text_of((rec.get("message") or {}).get("content"))
+            body = " ".join(body.split())
+            if body and not body.startswith("<"):
+                title = body[:MAX_TITLE]
+                started = rec.get("timestamp", "")
+
+        if title and cwd:
+            break
+
+    if not title:
+        return None  # No human turn: an aborted or empty session.
+
+    # The typed message becomes the subtitle once a real title exists; without
+    # one it is promoted, since a rough title beats no title.
+    generated = ai_title(path, stat.st_size)
+    subtitle = title if generated else ""
+
+    return {
+        "id": os.path.basename(path)[:-6],
+        "cwd": cwd,
+        "title": generated or title,
+        "subtitle": subtitle,
+        "started": started,
+        "mtime": stat.st_mtime,
+        "size": stat.st_size,
+    }
+
+
+def main():
+    if not os.path.isdir(PROJECTS):
+        json.dump({"sessions": []}, sys.stdout)
+        return
+
+    sessions = []
+    for project in os.listdir(PROJECTS):
+        pdir = os.path.join(PROJECTS, project)
+        if not os.path.isdir(pdir):
+            continue
+        for name in os.listdir(pdir):
+            if not name.endswith(".jsonl"):
+                continue
+            info = session_info(os.path.join(pdir, name))
+            if not info:
+                continue
+            if not info["cwd"]:
+                # Claude encodes the path by replacing "/" with "-", which is
+                # lossy; only fall back to decoding when no turn recorded a cwd.
+                info["cwd"] = project.replace("-", "/")
+            sessions.append(info)
+
+    sessions.sort(key=lambda s: s["mtime"], reverse=True)
+    json.dump({"sessions": sessions}, sys.stdout)
+
+
+if __name__ == "__main__":
+    main()
