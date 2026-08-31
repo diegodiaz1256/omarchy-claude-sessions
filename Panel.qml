@@ -232,8 +232,9 @@ Item {
               Image {
                 id: claudeMark
                 anchors.fill: parent
-                // Relative to this QML file, which is the plugin's own folder;
-                // the manifest's source dir is not exposed on panel instances.
+                // Relative to this QML file, which is the plugin's own folder.
+                // Building an absolute "file://" + __sourceDir path instead
+                // resolved to file:///claude-mark.svg and silently failed.
                 source: "claude-mark.svg"
                 sourceSize.width: Style.font.icon * 2
                 sourceSize.height: Style.font.icon * 2

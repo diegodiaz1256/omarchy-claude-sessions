@@ -48,19 +48,27 @@ def text_of(content):
     return ""
 
 
-def ai_title(path, size):
-    """The newest ai-title in the file: Claude refines it as a session grows."""
-    found = ""
+def tail_facts(path, size):
+    """The newest ai-title, and a cwd, from the end of the file.
+
+    Claude refines the title as a session grows, so the last one wins. The cwd
+    is read here as well as from the head: a transcript that opens with a large
+    paste can push every early record past the head window, and the folder is
+    what resuming depends on.
+    """
+    title, cwd = "", ""
     for raw in tail_lines(path, size):
-        if b'"ai-title"' not in raw:
+        if b'"ai-title"' not in raw and b'"cwd"' not in raw:
             continue
         try:
             rec = json.loads(raw)
         except ValueError:
             continue
         if rec.get("type") == "ai-title" and rec.get("aiTitle"):
-            found = " ".join(str(rec["aiTitle"]).split())
-    return found
+            title = " ".join(str(rec["aiTitle"]).split())
+        if not cwd and rec.get("cwd"):
+            cwd = rec["cwd"]
+    return title, cwd
 
 
 def session_info(path):
@@ -95,12 +103,19 @@ def session_info(path):
         if title and cwd:
             break
 
-    if not title:
-        return None  # No human turn: an aborted or empty session.
+    # Read the generated title before deciding the session is unusable: a
+    # transcript that opens with a large paste or a long tool result can push
+    # the first typed message past the head window, and dropping the session
+    # entirely would hide it from the list even though it has a good title.
+    generated, tail_cwd = tail_facts(path, stat.st_size)
+    if not cwd:
+        cwd = tail_cwd
+
+    if not title and not generated:
+        return None  # No human turn and no title: an aborted or empty session.
 
     # The typed message becomes the subtitle once a real title exists; without
     # one it is promoted, since a rough title beats no title.
-    generated = ai_title(path, stat.st_size)
     subtitle = title if generated else ""
 
     return {
