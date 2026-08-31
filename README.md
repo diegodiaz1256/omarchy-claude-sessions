@@ -65,7 +65,7 @@ The project folder comes from the `cwd` recorded inside the session itself. Clau
 
 - Omarchy with `omarchy-shell`
 - `claude` on `PATH`
-- Python 3
+- `python3` (the panel says so plainly if it is missing)
 
 ## License
 
