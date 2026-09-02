@@ -27,8 +27,8 @@ ROWS = [
                         f'"action":"omarchy-shell shell summon {PLUGIN_ID}",'
                         '"when":"command -v claude"},'),
     ('"claude.new"', '  "claude.new": {"icon":"\U000f0415","label":"New Session",'
-                     '"description":"Start Claude Code in your home folder",'
-                     '"action":"omarchy-launch-tui --app-id=org.omarchy.claude claude",'
+                     '"description":"Start Claude Code in ~/Work",'
+                     r'"action":"omarchy-launch-tui --app-id=org.omarchy.claude bash -lc \"cd ~/Work && exec claude\"",'
                      '"when":"command -v claude"},'),
 ]
 
