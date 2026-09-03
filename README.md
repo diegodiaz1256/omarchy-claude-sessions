@@ -52,7 +52,7 @@ To do it by hand instead, add to that file:
 
 ```jsonc
 "claude": {"icon":"󰛄","label":"Claude","aliases":["ai","claude-code"]},
-"claude.resume": {"icon":"󰑖","label":"Resume Session","aliases":["resume"],"action":"omarchy-shell shell summon diegodiaz1256.claude-sessions","when":"command -v claude"},
+"claude.resume": {"icon":"󰛄","label":"Resume Session","aliases":["resume"],"action":"omarchy-shell shell summon diegodiaz1256.claude-sessions","when":"command -v claude"},
 ```
 
 ### Bind it to a key

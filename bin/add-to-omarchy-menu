@@ -21,12 +21,12 @@ EXTENSIONS = os.path.expanduser("~/.config/omarchy/extensions/omarchy-menu.jsonc
 ROWS = [
     ('"claude"', '  "claude": {"icon":"\U000f06c4","label":"Claude","aliases":["ai","claude-code"],'
                  '"description":"Claude Code sessions"},'),
-    ('"claude.resume"', '  "claude.resume": {"icon":"\U000f0456","label":"Resume Session",'
+    ('"claude.resume"', '  "claude.resume": {"icon":"\U000f06c4","label":"Resume Session",'
                         '"aliases":["resume","sessions"],'
                         '"description":"Browse past Claude Code sessions and continue one",'
                         f'"action":"omarchy-shell shell summon {PLUGIN_ID}",'
                         '"when":"command -v claude"},'),
-    ('"claude.new"', '  "claude.new": {"icon":"\U000f0415","label":"New Session",'
+    ('"claude.new"', '  "claude.new": {"icon":"\U000f06c4","label":"New Session",'
                      '"description":"Start Claude Code in ~/Work",'
                      r'"action":"omarchy-launch-tui --app-id=org.omarchy.claude bash -lc \"cd ~/Work && exec claude\"",'
                      '"when":"command -v claude"},'),
