@@ -355,15 +355,32 @@ Item {
                   anchors.margins: Style.spacing.md
                   spacing: Style.spacing.hairline
 
-                  Text {
+                  RowLayout {
                     Layout.fillWidth: true
-                    text: modelData.title
-                    color: index === root.cursor ? Color.menu.selectedText : Color.menu.text
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.subtitle
-                    font.weight: index === root.cursor ? Font.DemiBold : Font.Normal
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
+                    spacing: Style.spacing.sm
+
+                    // A running session gets a small live dot ahead of its
+                    // title, so a session still open elsewhere is obvious
+                    // without reading the whole row.
+                    Rectangle {
+                      visible: !!modelData.status
+                      Layout.preferredWidth: 6
+                      Layout.preferredHeight: 6
+                      radius: 3
+                      color: Color.accent
+                      Layout.alignment: Qt.AlignVCenter
+                    }
+
+                    Text {
+                      Layout.fillWidth: true
+                      text: modelData.title
+                      color: index === root.cursor ? Color.menu.selectedText : Color.menu.text
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.subtitle
+                      font.weight: index === root.cursor ? Font.DemiBold : Font.Normal
+                      elide: Text.ElideRight
+                      maximumLineCount: 1
+                    }
                   }
 
                   RowLayout {
@@ -393,8 +410,9 @@ Item {
 
                     Text {
                       id: age
-                      text: root.relativeTime(modelData.mtime)
-                      color: Color.muted
+                      text: modelData.status
+                        ? modelData.status : root.relativeTime(modelData.mtime)
+                      color: modelData.status ? Color.accent : Color.muted
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.bodySmall
                     }

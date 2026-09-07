@@ -19,9 +19,37 @@ import os
 import sys
 
 PROJECTS = os.path.expanduser("~/.claude/projects")
+SESSIONS_DIR = os.path.expanduser("~/.claude/sessions")
 HEAD_BYTES = 512 * 1024
 TAIL_BYTES = 64 * 1024
 MAX_TITLE = 120
+
+
+def live_sessions():
+    """sessionId -> status ("busy"/"idle"/...) for every session with a live process.
+
+    Claude Code registers one JSON file per running process under
+    ~/.claude/sessions/<pid>.json. A registry entry can outlive its process
+    (a crash skips cleanup), so a pid is only trusted once /proc confirms it
+    is still running.
+    """
+    live = {}
+    try:
+        names = os.listdir(SESSIONS_DIR)
+    except OSError:
+        return live
+    for name in names:
+        if not name.endswith(".json"):
+            continue
+        try:
+            rec = json.load(open(os.path.join(SESSIONS_DIR, name)))
+        except (OSError, ValueError):
+            continue
+        sid, pid = rec.get("sessionId"), rec.get("pid")
+        if not sid or not pid or not os.path.exists(f"/proc/{pid}"):
+            continue
+        live[sid] = rec.get("status") or "running"
+    return live
 
 
 def head_lines(path):
@@ -134,6 +162,8 @@ def main():
         json.dump({"sessions": []}, sys.stdout)
         return
 
+    live = live_sessions()
+
     sessions = []
     for project in os.listdir(PROJECTS):
         pdir = os.path.join(PROJECTS, project)
@@ -149,6 +179,7 @@ def main():
                 # Claude encodes the path by replacing "/" with "-", which is
                 # lossy; only fall back to decoding when no turn recorded a cwd.
                 info["cwd"] = project.replace("-", "/")
+            info["status"] = live.get(info["id"], "")
             sessions.append(info)
 
     sessions.sort(key=lambda s: s["mtime"], reverse=True)

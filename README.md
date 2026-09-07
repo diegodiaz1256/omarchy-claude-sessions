@@ -9,6 +9,7 @@ Claude's own `claude --resume` picker only lists sessions belonging to the direc
 ## Features
 
 - Every session from every project, most recent first
+- Shows which sessions are running right now (busy/idle), and how long ago the rest were last touched
 - Readable titles — uses the `ai-title` Claude generates per session, falling back to the first message you typed
 - Type to filter across titles, your original message, and folder paths
 - `↑`/`↓` to select, `Enter` to resume, `Esc` to close
