@@ -410,8 +410,12 @@ Item {
 
                     Text {
                       id: age
+                      // A live row shows its status plus the session's own
+                      // self-reported name, so it can be matched against
+                      // ListAgents/SendMessage output without guessing.
                       text: modelData.status
-                        ? modelData.status : root.relativeTime(modelData.mtime)
+                        ? modelData.status + (modelData.liveName ? " · " + modelData.liveName : "")
+                        : root.relativeTime(modelData.mtime)
                       color: modelData.status ? Color.accent : Color.muted
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.bodySmall

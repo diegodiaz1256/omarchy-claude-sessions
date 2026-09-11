@@ -26,12 +26,14 @@ MAX_TITLE = 120
 
 
 def live_sessions():
-    """sessionId -> status ("busy"/"idle"/...) for every session with a live process.
+    """sessionId -> {status, name} for every session with a live process.
 
     Claude Code registers one JSON file per running process under
     ~/.claude/sessions/<pid>.json. A registry entry can outlive its process
     (a crash skips cleanup), so a pid is only trusted once /proc confirms it
-    is still running.
+    is still running. `name` is that session's self-reported name (derived
+    or user-set via /rename) and is shown so a live row is identifiable
+    against ListAgents/SendMessage output, not just "busy" or "idle".
     """
     live = {}
     try:
@@ -48,7 +50,7 @@ def live_sessions():
         sid, pid = rec.get("sessionId"), rec.get("pid")
         if not sid or not pid or not os.path.exists(f"/proc/{pid}"):
             continue
-        live[sid] = rec.get("status") or "running"
+        live[sid] = {"status": rec.get("status") or "running", "name": rec.get("name") or ""}
     return live
 
 
@@ -179,7 +181,9 @@ def main():
                 # Claude encodes the path by replacing "/" with "-", which is
                 # lossy; only fall back to decoding when no turn recorded a cwd.
                 info["cwd"] = project.replace("-", "/")
-            info["status"] = live.get(info["id"], "")
+            entry = live.get(info["id"]) or {}
+            info["status"] = entry.get("status", "")
+            info["liveName"] = entry.get("name", "")
             sessions.append(info)
 
     sessions.sort(key=lambda s: s["mtime"], reverse=True)
