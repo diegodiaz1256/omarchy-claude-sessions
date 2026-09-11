@@ -24,6 +24,9 @@ Item {
 
   property var shell: null
   property var manifest: null
+  // The shell only injects this when the property exists on the root
+  // object, and only it can resolve a directory once __sourceDir is gone.
+  property var pluginRegistry: null
 
   property bool opened: false
   property var sessions: []
@@ -33,8 +36,31 @@ Item {
   property string error: ""
 
   readonly property string fontFamily: Style.font.family
-  readonly property string listScript: (manifest && manifest.__sourceDir ? manifest.__sourceDir : "")
-    + "/bin/claude-sessions-list"
+
+  // Omarchy strips __sourceDir (and __isFirstParty, __hostCapabilities) from
+  // a third-party plugin's manifest before handing it to the plugin, so it
+  // is only ever present for a first-party one. Third-party has to recover
+  // the directory through pluginRegistry.entryPointUrl() instead, which
+  // resolves against the shell's own unstripped copy of the manifest.
+  // entryPointUrl only needs candidate.id, and id survives the stripping,
+  // so the stripped manifest is fine to pass in.
+  //
+  // Silent failure otherwise: an empty sourceDir here previously resolved
+  // listScript to "/bin/claude-sessions-list", which does not exist, so the
+  // panel hung on "Reading sessions..." forever with nothing but a
+  // "Process failed to start" line in the shell's own log to explain why.
+  readonly property string sourceDir: {
+    if (manifest && manifest.__sourceDir) return String(manifest.__sourceDir)
+    if (pluginRegistry && manifest) {
+      var url = String(pluginRegistry.entryPointUrl(manifest, "panel") || "")
+      var path = url.replace(/^file:\/\//, "")
+      var cut = path.lastIndexOf("/")
+      if (cut > 0) return path.substring(0, cut)
+    }
+    return ""
+  }
+
+  readonly property string listScript: root.sourceDir + "/bin/claude-sessions-list"
 
   // Matching is per-word across title, the original typed message, and folder
   // together, so "omarchy menu" finds a session whose title has one word and
@@ -77,6 +103,13 @@ Item {
 
   function reload() {
     if (listProc.running) return
+    // A bare "/bin/claude-sessions-list" (sourceDir empty) fails to launch
+    // with only a line in the shell's own log, and the panel would hang on
+    // "Reading sessions..." forever with nothing telling the user why.
+    if (!root.sourceDir) {
+      root.error = "Could not find this plugin's own folder"
+      return
+    }
     root.loading = true
     listProc.collected = ""
     listProc.command = [root.listScript]
