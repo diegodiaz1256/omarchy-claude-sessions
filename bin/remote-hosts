@@ -1,0 +1,11 @@
+# SSH hosts to include in the Claude Sessions panel, one per line.
+#
+# Each must be reachable as `ssh <host>` with no password prompt (a key
+# in the SSH agent, or 1Password's SSH agent, is enough -- BatchMode is
+# used so a host needing a password is skipped rather than hanging the
+# panel), and must have `claude` and `python3` on PATH in a login shell.
+#
+# Lines starting with # are ignored. Blank lines are ignored.
+
+homelab.home
+back.homelab.home

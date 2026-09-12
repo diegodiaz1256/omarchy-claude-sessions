@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+"""Merge local and remote Claude Code sessions for the claude-sessions panel.
+
+Runs claude-sessions-list locally, then pipes its own source over SSH to
+each host named in remote-hosts and runs it there too -- the script is
+plain stdlib Python with no local-machine assumptions, so the same file
+works unmodified on either side. Every session gets a "host" field: empty
+for local, the SSH host name otherwise, so the panel can badge and resume
+remote rows differently.
+
+Remote fetches run in parallel and are given a short timeout, so one
+unreachable host (asleep, off the network, a stale entry in remote-hosts)
+costs at most that timeout rather than hanging the panel or dropping every
+other host's results.
+
+Usage:
+  claude-sessions-list-all               local + every configured remote host
+  claude-sessions-list-all --no-remote   local only (the fast path)
+  claude-sessions-list-all --remote-only every configured remote host, no local scan
+"""
+
+import json
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+LOCAL_LISTER = os.path.join(HERE, "claude-sessions-list")
+HOSTS_FILE = os.path.join(HERE, "remote-hosts")
+SSH_TIMEOUT = 5
+
+
+def hosts():
+    try:
+        lines = open(HOSTS_FILE).read().splitlines()
+    except OSError:
+        return []
+    return [ln.strip() for ln in lines if ln.strip() and not ln.strip().startswith("#")]
+
+
+def local_sessions():
+    try:
+        out = subprocess.run([sys.executable, LOCAL_LISTER],
+                              capture_output=True, timeout=30, check=False)
+        return json.loads(out.stdout or b"{}").get("sessions", [])
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return []
+
+
+def remote_sessions(host):
+    """Run this same script's sibling lister on `host` over SSH.
+
+    BatchMode=yes so a host that would otherwise prompt for a password is
+    skipped instead of hanging the whole panel waiting on input nobody can
+    give it. `bash -lc` gets a login shell, since claude and python3 often
+    live somewhere a bare SSH command's PATH does not reach (a version
+    manager shim, ~/.local/bin, ...).
+    """
+    try:
+        source = open(LOCAL_LISTER, "rb").read()
+    except OSError:
+        return []
+    try:
+        proc = subprocess.run(
+            ["ssh", "-o", "BatchMode=yes", "-o", f"ConnectTimeout={SSH_TIMEOUT}",
+             host, "bash", "-lc", "python3 -"],
+            input=source, capture_output=True, timeout=SSH_TIMEOUT + 10, check=False)
+        sessions = json.loads(proc.stdout or b"{}").get("sessions", [])
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return []
+    for s in sessions:
+        s["host"] = host
+    return sessions
+
+
+def main():
+    args = sys.argv[1:]
+    include_local = "--remote-only" not in args
+    include_remote = "--no-remote" not in args
+
+    sessions = local_sessions() if include_local else []
+
+    if include_remote:
+        host_list = hosts()
+        if host_list:
+            # One process per host, all launched before any is waited on,
+            # so N unreachable hosts cost one timeout rather than N of them.
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(host_list)) as pool:
+                for result in pool.map(remote_sessions, host_list):
+                    sessions.extend(result)
+
+    sessions.sort(key=lambda s: s["mtime"], reverse=True)
+    # Told to the panel so it only shows the local/remote toggle when there
+    # is actually a choice to make -- no configured hosts means switching
+    # to "remote" would just show an empty list forever.
+    json.dump({"sessions": sessions, "hasRemoteHosts": bool(hosts())}, sys.stdout)
+
+
+if __name__ == "__main__":
+    main()

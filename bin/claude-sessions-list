@@ -184,6 +184,11 @@ def main():
             entry = live.get(info["id"]) or {}
             info["status"] = entry.get("status", "")
             info["liveName"] = entry.get("name", "")
+            # Empty here means local. This script also runs unmodified on a
+            # remote host (piped over SSH via `python3 -`), and the caller
+            # that merges the two outputs is what fills this in, since only
+            # it knows which host it dialed.
+            info["host"] = ""
             sessions.append(info)
 
     sessions.sort(key=lambda s: s["mtime"], reverse=True)

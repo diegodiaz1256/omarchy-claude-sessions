@@ -29,11 +29,22 @@ Item {
   property var pluginRegistry: null
 
   property bool opened: false
-  property var sessions: []
+  property var localSessions: []
+  property var remoteSessions: []
+  property bool hasRemoteHosts: false
+  // Which list is on screen. Local loads on every open since it is a plain
+  // filesystem scan; remote is an SSH round trip per host, so it is fetched
+  // lazily on first switch and then cached until Ctrl+R, rather than
+  // dialing out on every open the way local re-reads every time.
+  property string view: "local"
+  property bool remoteFetched: false
   property string query: ""
   property int cursor: 0
   property bool loading: false
+  property bool remoteLoading: false
   property string error: ""
+
+  readonly property var sessions: root.view === "remote" ? root.remoteSessions : root.localSessions
 
   readonly property string fontFamily: Style.font.family
 
@@ -60,7 +71,7 @@ Item {
     return ""
   }
 
-  readonly property string listScript: root.sourceDir + "/bin/claude-sessions-list"
+  readonly property string listScript: root.sourceDir + "/bin/claude-sessions-list-all"
 
   // Matching is per-word across title, the original typed message, and folder
   // together, so "omarchy menu" finds a session whose title has one word and
@@ -90,7 +101,8 @@ Item {
     root.cursor = 0
     root.error = ""
     root.opened = true
-    reload()
+    root.view = "local"
+    reloadLocal()
     // The window is instantiated hidden, so focus set before the surface is
     // mapped lands nowhere. Re-acquire once it exists.
     Qt.callLater(function() { if (root.opened) search.forceActiveFocus() })
@@ -99,9 +111,10 @@ Item {
   function close() {
     root.opened = false
     if (listProc.running) listProc.running = false
+    if (remoteProc.running) remoteProc.running = false
   }
 
-  function reload() {
+  function reloadLocal() {
     if (listProc.running) return
     // A bare "/bin/claude-sessions-list" (sourceDir empty) fails to launch
     // with only a line in the shell's own log, and the panel would hang on
@@ -112,8 +125,47 @@ Item {
     }
     root.loading = true
     listProc.collected = ""
-    listProc.command = [root.listScript]
+    listProc.command = [root.listScript, "--no-remote"]
     listProc.running = true
+  }
+
+  function reloadRemote() {
+    if (remoteProc.running) return
+    if (!root.sourceDir) {
+      root.error = "Could not find this plugin's own folder"
+      return
+    }
+    root.remoteLoading = true
+    remoteProc.collected = ""
+    // --no-remote here too: this process only wants the SSH hosts, and the
+    // local scan the base command would also run is redundant work spent
+    // waiting on the (already up to date) local list a second time.
+    remoteProc.command = [root.listScript, "--remote-only"]
+    remoteProc.running = true
+  }
+
+  // Tab switches between local and remote sessions. Remote is fetched only
+  // the first time it is switched to, then cached until Ctrl+R -- an SSH
+  // round trip per host on every keypress would make the toggle feel like
+  // it hangs.
+  function toggleView() {
+    root.view = root.view === "local" ? "remote" : "local"
+    root.query = ""
+    search.text = ""
+    root.cursor = 0
+    root.error = ""
+    if (root.view === "remote" && !root.remoteFetched) reloadRemote()
+  }
+
+  // Ctrl+R re-dials whichever list is currently on screen.
+  function refresh() {
+    root.error = ""
+    if (root.view === "remote") {
+      root.remoteFetched = false
+      reloadRemote()
+    } else {
+      reloadLocal()
+    }
   }
 
   // Keep the cursor on a row that exists: the list shrinks as the query gets
@@ -144,8 +196,17 @@ Item {
       + "echo \"  \" " + quotedDir + "; echo; "
       + "read -rsn1 -p 'Press any key to close...'; exit 1; "
       + "fi; exec claude --resume " + Util.shellQuote(session.id)
+
+    var command = session.host
+      // -t forces a PTY: claude is an interactive TUI, and without one SSH
+      // would hand it a pipe instead of a terminal. BatchMode keeps a host
+      // that would otherwise prompt for a password from hanging the window
+      // silently instead of the folder-missing message actually showing.
+      ? ["ssh", "-t", "-o", "BatchMode=yes", session.host, "bash", "-lc", cmd]
+      : ["bash", "-lc", cmd]
+
     Quickshell.execDetached(["omarchy-launch-tui",
-      "--app-id=org.omarchy.claude-resume", "bash", "-lc", cmd])
+      "--app-id=org.omarchy.claude-resume"].concat(command))
     root.close()
   }
 
@@ -187,10 +248,39 @@ Item {
       }
       try {
         var parsed = JSON.parse(listProc.collected || "{}")
-        root.sessions = parsed.sessions || []
+        root.localSessions = parsed.sessions || []
+        root.hasRemoteHosts = !!parsed.hasRemoteHosts
         root.cursor = 0
       } catch (e) {
         root.error = "Could not parse the session list"
+      }
+    }
+  }
+
+  // Fetches every configured remote host, triggered on first switch to the
+  // remote view (see toggleView) rather than on every open, since each
+  // host costs an SSH round trip.
+  Process {
+    id: remoteProc
+    property string collected: ""
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: remoteProc.collected = String(text || "")
+    }
+    onExited: function(exitCode) {
+      root.remoteLoading = false
+      root.remoteFetched = true
+      if (!root.opened) return
+      if (exitCode !== 0) {
+        root.error = "Could not reach any remote host"
+        return
+      }
+      try {
+        var parsed = JSON.parse(remoteProc.collected || "{}")
+        root.remoteSessions = parsed.sessions || []
+        root.cursor = 0
+      } catch (e) {
+        root.error = "Could not parse the remote session list"
       }
     }
   }
@@ -292,6 +382,18 @@ Item {
               font.weight: Font.DemiBold
             }
 
+            Text {
+              // Only shown once there is a choice to indicate: no configured
+              // remote hosts means the toggle never does anything, and
+              // announcing a mode that cannot change would just be noise.
+              visible: root.hasRemoteHosts
+              text: root.view === "remote" ? "Remote" : "Local"
+              color: Color.accent
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              font.weight: Font.DemiBold
+            }
+
             Item { Layout.fillWidth: true }
 
             Text {
@@ -320,6 +422,18 @@ Item {
             Keys.onEscapePressed: root.close()
             Keys.onReturnPressed: root.resume(root.filtered[root.cursor])
             Keys.onEnterPressed: root.resume(root.filtered[root.cursor])
+            // Tab would otherwise move focus off the only focusable control
+            // in this window; claimed here instead to flip local/remote.
+            Keys.onTabPressed: function(event) {
+              if (root.hasRemoteHosts) root.toggleView()
+              event.accepted = true
+            }
+            Keys.onPressed: function(event) {
+              if (event.key === Qt.Key_R && (event.modifiers & Qt.ControlModifier)) {
+                root.refresh()
+                event.accepted = true
+              }
+            }
           }
 
           // The list and the empty-state message share one stretching slot.
@@ -335,14 +449,18 @@ Item {
             Layout.minimumHeight: root.filtered.length > 0 ? 0 : Style.font.body * 3
 
             Text {
+              readonly property bool activeLoading: root.view === "remote" ? root.remoteLoading : root.loading
+
               anchors.left: parent.left
               anchors.right: parent.right
               anchors.top: parent.top
-              visible: root.error !== "" || root.loading
-                || (root.filtered.length === 0 && !root.loading)
+              visible: root.error !== "" || activeLoading
+                || (root.filtered.length === 0 && !activeLoading)
               text: root.error !== "" ? root.error
-                : root.loading ? "Reading sessions…"
-                : root.sessions.length === 0 ? "No Claude sessions yet"
+                : activeLoading
+                  ? (root.view === "remote" ? "Reading remote sessions…" : "Reading sessions…")
+                : root.sessions.length === 0
+                  ? (root.view === "remote" ? "No remote sessions yet" : "No Claude sessions yet")
                 : "No session matches “" + root.query + "”"
               color: root.error !== "" ? Color.urgent : Color.muted
               font.family: root.fontFamily
@@ -421,7 +539,10 @@ Item {
                     spacing: Style.spacing.sm
 
                     Text {
-                      text: root.shortPath(modelData.cwd)
+                      // Two configured hosts can otherwise show the same
+                      // path with nothing distinguishing which machine it
+                      // is on.
+                      text: (modelData.host ? modelData.host + ":" : "") + root.shortPath(modelData.cwd)
                       color: Color.muted
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.bodySmall
@@ -463,8 +584,11 @@ Item {
 
           Text {
             Layout.fillWidth: true
-            visible: root.filtered.length > 0
-            text: "↑↓ select · ⏎ resume · esc close"
+            visible: root.filtered.length > 0 || root.hasRemoteHosts
+            text: root.filtered.length > 0
+              ? "↑↓ select · ⏎ resume · esc close"
+                + (root.hasRemoteHosts ? " · tab " + (root.view === "remote" ? "local" : "remote") + " · ^r refresh" : "")
+              : "tab " + (root.view === "remote" ? "local" : "remote") + " · ^r refresh · esc close"
             color: Color.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall

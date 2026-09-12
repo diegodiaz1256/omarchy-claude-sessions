@@ -12,7 +12,8 @@ Claude's own `claude --resume` picker only lists sessions belonging to the direc
 - Shows which sessions are running right now (busy/idle), and how long ago the rest were last touched
 - Readable titles — uses the `ai-title` Claude generates per session, falling back to the first message you typed
 - Type to filter across titles, your original message, and folder paths
-- `↑`/`↓` to select, `Enter` to resume, `Esc` to close
+- `Tab` to switch to sessions on a remote host over SSH, and back
+- `↑`/`↓` to select, `Enter` to resume, `Ctrl+R` to refresh, `Esc` to close
 - Themed with the active Omarchy theme
 
 ## Install
@@ -70,6 +71,25 @@ To see what is taken:
 ```bash
 hyprctl binds -j | jq -r '.[] | select(.modmask == 64) | .key' | sort -u
 ```
+
+### Remote hosts
+
+If you run Claude Code over SSH on other machines, list them in
+`bin/remote-hosts` (one per line, `#` for comments):
+
+```
+myserver.example.com
+homelab.local
+```
+
+Each must be reachable as `ssh <host>` with no password prompt (a key in
+your SSH agent, including 1Password's, is enough) and must have `claude`
+and `python3` on `PATH` in a login shell. Press `Tab` in the panel to
+switch to that host's sessions; resuming opens an SSH session and runs
+`claude --resume` there instead of locally. Remote sessions are fetched once, on the first `Tab`, and stay cached
+across closing and reopening the panel until you press `Ctrl+R`, since
+each host costs a round trip and an unreachable one turns that into a
+multi-second wait; local sessions always reload fresh on every open.
 
 ## Uninstall
 
