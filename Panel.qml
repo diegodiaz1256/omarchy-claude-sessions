@@ -197,12 +197,21 @@ Item {
       + "read -rsn1 -p 'Press any key to close...'; exit 1; "
       + "fi; exec claude --resume " + Util.shellQuote(session.id)
 
+    // Unlike a local exec, where each array element reaches bash -lc as its
+    // own untouched argv entry, SSH joins every trailing argument with a
+    // single space and hands that one string to the remote shell to
+    // re-parse. Passed unquoted, "bash -lc if ! cd ... ; exec claude ..."
+    // splits back apart there: -lc's argument becomes just "if" (bash's
+    // own $0), and the rest runs as unrelated words rather than the script
+    // -- claude ends up started with no --resume id at all, silently. The
+    // whole script has to be re-quoted into the one argv slot SSH actually
+    // preserves as a unit.
     var command = session.host
       // -t forces a PTY: claude is an interactive TUI, and without one SSH
       // would hand it a pipe instead of a terminal. BatchMode keeps a host
       // that would otherwise prompt for a password from hanging the window
       // silently instead of the folder-missing message actually showing.
-      ? ["ssh", "-t", "-o", "BatchMode=yes", session.host, "bash", "-lc", cmd]
+      ? ["ssh", "-t", "-o", "BatchMode=yes", session.host, "bash", "-lc", Util.shellQuote(cmd)]
       : ["bash", "-lc", cmd]
 
     Quickshell.execDetached(["omarchy-launch-tui",
