@@ -191,6 +191,24 @@ def main():
             info["host"] = ""
             sessions.append(info)
 
+    # `claude --resume --fork-session` creates a new session id that starts
+    # as a copy of another, so the two show the same title in the same
+    # folder and are easy to mistake for one session listed twice. There
+    # is no record anywhere on disk of which session a fork came from -- that
+    # link only exists in the forking process's own launch arguments, gone
+    # once it exits -- so this can only flag the same-title-same-folder
+    # pattern as a possible fork, not confirm one. A real coincidence (two
+    # unrelated sessions in one repo landing on the same generated title)
+    # will also be flagged; that is the tradeoff of a heuristic with no
+    # ground truth to check against.
+    seen = {}
+    for s in sessions:
+        seen.setdefault((s["cwd"], s["title"]), []).append(s)
+    for group in seen.values():
+        if len(group) > 1:
+            for s in group:
+                s["possibleDuplicate"] = True
+
     sessions.sort(key=lambda s: s["mtime"], reverse=True)
     json.dump({"sessions": sessions}, sys.stdout)
 

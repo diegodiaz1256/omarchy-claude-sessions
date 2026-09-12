@@ -541,6 +541,23 @@ Item {
                       elide: Text.ElideRight
                       maximumLineCount: 1
                     }
+
+                    // `claude --resume --fork-session` starts a new session
+                    // id as a copy of another, so the fork and its source
+                    // share this title and folder and look like the same
+                    // session listed twice. Nothing on disk records which
+                    // session a fork came from, so this can only flag the
+                    // pattern, not confirm a fork -- an unrelated session
+                    // that happens to land on the same generated title
+                    // would show the same tag.
+                    Text {
+                      visible: !!modelData.possibleDuplicate
+                      text: "possible duplicate"
+                      color: Color.muted
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                      font.italic: true
+                    }
                   }
 
                   RowLayout {
