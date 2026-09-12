@@ -6,6 +6,6 @@
 # panel), and must have `claude` and `python3` on PATH in a login shell.
 #
 # Lines starting with # are ignored. Blank lines are ignored.
-
-homelab.home
-back.homelab.home
+#
+# myserver.example.com
+# homelab.local
